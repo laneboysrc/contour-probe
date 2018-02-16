@@ -6,6 +6,8 @@ A small micro-switch is mounted to the hot-end, and the object to scan is secure
 
 This program was designed for the Lulzbot Mini. Other 3D printers with USB port may work, but will most likely require changes to this program.
 
+YouTube video (click to play on YouTube):
+[![Video of the contour probe](youtube-video-WyG0qMrKR8U.png)](https://youtu.be/WyG0qMrKR8U "Scanning surfaces with a 3D printer")
 
 # Important
 
