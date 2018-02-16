@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+	<head>
+    <meta charset='utf-8'>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+		<title>Contour probe</title>
+
+		<!-- Include eel.js - note this file doesn't exist in the 'web' directory -->
+		<script src="/eel.js"></script>
+		<script>
+
+    let start = {x:15, y:160, z:105};
+    let end = {x:60, y:160, z:115};
+    let move_to_form;
+    let scan_form;
+    let messages;
+    let progressbar;
+    let total_points = 0;
+    let scanned_points = 0;
+
+    // Estimated probe time per point in seconds
+    const probe_time_s = 2;
+
+		eel.expose(log);
+		function log(message) {
+			console.log(message);
+		}
+
+    eel.expose(progress);
+    function progress(x, y, z) {
+      messages.textContent = "Probe touched at " + x + " " + y + " " + z;
+      scanned_points += 1;
+      progressbar.value = scanned_points / total_points;
+    }
+
+    async function move_to(point) {
+      console.log('Moving to', point);
+      await eel.move_to(point)();
+      console.log('Done');
+    }
+
+    async function scan(start, end, x_step, z_step, y_clearance, name) {
+      document.querySelectorAll('input,button').forEach(element => {
+        element.disabled = true;
+      });
+
+      total_points = ((end.x - start.x) / x_step + 1) * ((end.z - start.z) / z_step + 1);
+      scanned_points = 0;
+
+      progressbar.value = 0;
+      progressbar.style.display = 'block';
+      messages.textContent = "Scan started"
+
+      console.log('Scanning from', start, 'to', end, x_step, z_step, y_clearance);
+      await eel.scan(start, end, x_step, z_step, y_clearance, name)();
+      console.log('Done');
+
+      progressbar.style.display = 'none';
+      messages.textContent = "Scanning done"
+
+      document.querySelectorAll('input,button').forEach(element => {
+        element.disabled = false;
+      });
+    }
+
+    function format_time(t) {
+      h = 0;
+      m = 0;
+      s = 0;
+
+      if (t > 60 * 60) {
+        h = Math.floor(t / (60 * 60));
+        t = t - h * 60 * 60;
+      }
+
+      if (t > 60) {
+        m = Math.floor(t / 60);
+        t = t - m * 60;
+      }
+
+      s = Math.floor(t);
+
+      if (h > 0) {
+        return h + "h " + m + "m";
+      }
+
+      if (m > 0) {
+        return m + " minutes";
+      }
+
+      return s + " seconds";
+    }
+
+    function get_xyz(className) {
+      x = parseInt(document.querySelector('input.' + className + '[name="x"]').value, 10);
+      y = parseInt(document.querySelector('input.' + className + '[name="y"]').value, 10);
+      z = parseInt(document.querySelector('input.' + className + '[name="z"]').value, 10);
+      return {x:x, y:y, z:z};
+    }
+
+    function start_scan() {
+        const start = get_xyz('start');
+        const end = get_xyz('end');
+
+        const x = parseFloat(document.querySelector('input.step[name="x"]').value);
+        const y = parseInt(document.querySelector('input.step[name="y"]').value, 10);
+        const z = parseFloat(document.querySelector('input.step[name="z"]').value);
+
+        const name = document.getElementById('scan_name').value;
+
+        scan(start, end, x, z, y, name);
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      move_to_form = document.getElementById('move_to');
+      scan_form = document.getElementById('scan');
+      messages = document.getElementById('messages');
+      progressbar = document.getElementById('progressbar');
+
+      scan_form.querySelector('button').addEventListener('click', () => {
+        start_scan();
+      });
+
+      move_to_form.addEventListener('submit', event => {
+        event.preventDefault();
+        point = get_xyz('move_to');
+        move_to(point);
+      });
+
+      move_to_form.querySelectorAll('input[type="number"]').forEach(element => {
+        element.addEventListener('change', () => {
+          if (move_to_form.querySelector('input[type="checkbox"]').checked) {
+            point = get_xyz('move_to');
+            move_to(point);
+          }
+        });
+      });
+
+      scan_form.querySelectorAll('input[type="number"]').forEach(element => {
+        element.addEventListener('change', () => {
+          const start = get_xyz('start');
+          const end = get_xyz('end');
+
+          const x_step = parseFloat(document.querySelector('input.step[name="x"]').value);
+          const z_step = parseFloat(document.querySelector('input.step[name="z"]').value);
+
+          total_points = parseInt(((end.x - start.x) / x_step + 1) * ((end.z - start.z) / z_step + 1));
+          estimated_time = total_points * probe_time_s;
+
+          messages.textContent = total_points + " probing points, estimated " + format_time(estimated_time);
+
+        });
+      });
+
+      scan_form.addEventListener('submit', event => {
+        event.preventDefault();
+        start_scan();
+      });
+    });
+
+		</script>
+
+    <style type="text/css">
+      body {
+        font-family: sans-serif;
+      }
+
+      form {
+        margin-top: 1em;
+        padding: 0.5em 1em;
+        border: 1px solid #bbb;
+      }
+
+      input[type="number"] {
+        width: 5em;
+        /*font-size: 1.5em;*/
+      }
+
+      h1, h2 {
+        margin-top: 0;
+        margin-bottom: 0;
+      }
+
+      h1 + h2 {
+        font-size: 1em;
+        color: #aaa;
+      }
+
+      form h2 {
+        font-size: 1em;
+        margin-bottom: 0.5em;
+      }
+
+      progress {
+        width: 100%;
+        display: none;
+      }
+
+      label {
+        font-size: 0.8em;
+      }
+
+      .version {
+        font-size: 0.8em;
+        position: absolute;
+        top: 0;
+        right: 0;
+        margin: 5px 10px;
+      }
+
+      .table {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .col3 {
+        grid-column: 1 / 4;
+      }
+
+      .space_before {
+        margin-top: 10px;
+      }
+
+      input.end[name="y"] {
+        display: None;
+      }
+    </style>
+	</head>
+
+	<body>
+    <h1>Contour probe</h1>
+		<h2>Use your 3D printer to probe vertical surfaces</h2>
+    <div class="version">v1.0</div>
+
+    <form id="move_to">
+      <h2>Probe movement</h2>
+      <div class="table">
+        <div>x</div>
+        <div>y</div>
+        <div>z</div>
+        <div><input class="move_to" type="number" name="x", min="0", max="160", value="15"></div>
+        <div><input class="move_to" type="number" name="y", min="0", max="160", value="160"></div>
+        <div><input class="move_to" type="number" name="z", min="0", max="160", value="105"></div>
+        <div class="space_before"><button type="submit">move_to</button></div>
+        <div class="space_before"><input id="move_to_auto" type="checkbox"><label for="move_to_auto">Auto move</label></div>
+      </div>
+    </form>
+
+    <form id="scan">
+      <h2>Scanning</h2>
+      <div class="table">
+        <div class="col3"><label for="scan_name">Name:</label> <input id="scan_name" class="name" type="text" name="name", value="scan"></div>
+        <div class="space_before">start x</div>
+        <div class="space_before">y</div>
+        <div class="space_before">z</div>
+        <div><input class="start" type="number" name="x", min="0", max="160", value="0"></div>
+        <div><input class="start" type="number" name="y", min="0", max="160", value="10"></div>
+        <div><input class="start" type="number" name="z", min="0", max="160", value="0"></div>
+        <div class="space_before">end x</div>
+        <div class="space_before"></div>
+        <div class="space_before">z</div>
+        <div><input class="end" type="number" name="x", min="0", max="160", value="50"></div>
+        <div><input class="end" type="number" name="y", min="0", max="160", value="0"></div>
+        <div><input class="end" type="number" name="z", min="0", max="160", value="50"></div>
+        <div class="space_before">x step</div>
+        <div class="space_before">y_retract</div>
+        <div class="space_before">z step</div>
+        <div><input class="step" type="number" name="x", min="0.1", max="10", step="0.1", value="10"></div>
+        <div><input class="step" type="number" name="y", min="0", max="10", value="0"></div>
+        <div><input class="step" type="number" name="z", min="0.1", max="10", step="0.1", value="10"></div>
+        <div class="space_before"><button type="button">scan</button></div>
+      </div>
+      <div class="space_before" id="messages"></div>
+      <progress id="progressbar" value="0"></progress>
+    </form>
+
+	</body>
+</html>

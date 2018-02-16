@@ -1,0 +1,4 @@
+*.pyc
+*.probe_socket
+*.sublime-workspace
+env
